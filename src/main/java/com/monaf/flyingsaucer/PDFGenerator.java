@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -84,17 +85,21 @@ public class PDFGenerator implements Runnable{
 		// get options
 		Options options = new Options();
 		options.addOption("encoding", true, "Encoding");
+		options.addOption("host", true, "Hostname to run on (default localhost)");
 		options.addOption("port", true, "Local port to run server");
 
 		CommandLineParser parser = new PosixParser();
 		CommandLine cmd = parser.parse(options, args);
 		String encoding = cmd.getOptionValue("encoding");
 		String port = cmd.getOptionValue("port");
+		// if null, then the loopback is returned (localhost)
+		String host = cmd.getOptionValue("host");
 		
 		// version local server
 		if (null != port) {
-			ServerSocket socketserver = new ServerSocket(Integer.parseInt(port));
-			System.out.println("PDFConverter server started on port " + port);
+			InetAddress addr = InetAddress.getByName(host);
+			ServerSocket socketserver = new ServerSocket(Integer.parseInt(port), 0, addr);
+			System.out.println("PDFConverter server started on " + addr + ":" + port);
 			try {
 				while (true) {
 					Socket client = socketserver.accept();
