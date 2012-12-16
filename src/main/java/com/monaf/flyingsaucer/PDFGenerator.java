@@ -25,20 +25,24 @@ public class PDFGenerator implements Runnable{
 	private InputStream is;
 	private OutputStream os;
 	private Socket socket = null;
+	private boolean debug = false;
 	
-	
-	public PDFGenerator(String encoding, InputStream is, OutputStream os) {
+	public PDFGenerator(String encoding, InputStream is, OutputStream os, boolean debug) {
 		this.encoding = encoding;
 		this.is = is;
 		this.os = os;
+		this.debug = debug;
 	}
 	
-	public PDFGenerator(String encoding, Socket socket) throws IOException {
-		this(encoding, socket.getInputStream(), socket.getOutputStream());
+	public PDFGenerator(String encoding, Socket socket, boolean debug) throws IOException {
+		this(encoding, socket.getInputStream(), socket.getOutputStream(), debug);
 		this.socket = socket;
 	}
-	
+
 	public void run() {
+		if (debug) {
+			System.out.println("Starting new converter thread");
+		}
 		try {
 			// create pdf renderer
 			ITextRenderer renderer = new ITextRenderer();
@@ -56,13 +60,22 @@ public class PDFGenerator implements Runnable{
 			tidy.setOutputEncoding(encoding);
 			tidy.parse(this.is, htmlOutputStream);
 			htmlOutputStream.close();
-	
+			
+			if (debug) {
+				System.out.println("HTML input parsed");
+			}
+			
 			// render pdf from tidy html
 			renderer.setDocumentFromString(htmlOutputStream.toString(encoding));
 			renderer.layout();
 	
 			// output to system out
 			renderer.createPDF(this.os);
+			
+			if (debug) {
+				System.out.println("PDF Created, closing connection");
+			}
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -87,6 +100,7 @@ public class PDFGenerator implements Runnable{
 		options.addOption("encoding", true, "Encoding");
 		options.addOption("host", true, "Hostname to run on (default localhost)");
 		options.addOption("port", true, "Local port to run server");
+		options.addOption("debug", false, "Debug mode");
 
 		CommandLineParser parser = new PosixParser();
 		CommandLine cmd = parser.parse(options, args);
@@ -94,6 +108,10 @@ public class PDFGenerator implements Runnable{
 		String port = cmd.getOptionValue("port");
 		// if null, then the loopback is returned (localhost)
 		String host = cmd.getOptionValue("host");
+		boolean debug = false;
+		if (cmd.hasOption("debug")) {
+			debug = true;
+		}
 		
 		// version local server
 		if (null != port) {
@@ -104,7 +122,7 @@ public class PDFGenerator implements Runnable{
 				while (true) {
 					Socket client = socketserver.accept();
 					try {
-						Thread pdfGen = new Thread(new PDFGenerator(encoding, client));
+						Thread pdfGen = new Thread(new PDFGenerator(encoding, client, debug));
 						pdfGen.start();
 					} catch(IOException e) {
 						client.close();
@@ -115,7 +133,7 @@ public class PDFGenerator implements Runnable{
 			}
 		} else {
 			// version classique, STDIN > STDOUT
-			Thread pdfGen = new Thread(new PDFGenerator(encoding, System.in, System.out));
+			Thread pdfGen = new Thread(new PDFGenerator(encoding, System.in, System.out, debug));
 			pdfGen.start();
 		}
 	}
