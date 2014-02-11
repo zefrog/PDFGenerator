@@ -1,0 +1,24 @@
+Largely inspired by stedekay's SpraedPDFGenerator - https://github.com/stedekay/SpraedPDFGenerator
+
+This is a simple HTML to PDF converter, written in Java.
+
+Based on itext 2.0.8
+Using jtidy to clean HTML
+
+The improvements consist in using a socket to launch a thread each time a client connects to the server.
+Sending HTML content results in the server sending back a PDF file on the socket.
+
+The PDF generated is outputed directly to the socket, so you must take care of it.
+
+It's also possible to use it in a simple STDIN / STDOUT mode without launching a server.
+
+Usage
+=====
+
+Launching a server :
+java -jar pdfgenerator.jar --encoding UTF-8 --host localhost --port 9191
+
+STDIN/STDOUT mode :
+java -jar pdfgenerator.jar --encoding UTF-8 < file.html > file.pdf
+
+

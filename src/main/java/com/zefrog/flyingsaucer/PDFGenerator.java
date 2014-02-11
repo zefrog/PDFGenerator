@@ -1,4 +1,4 @@
-package com.monaf.flyingsaucer;
+package com.zefrog.flyingsaucer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,7 +15,9 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.w3c.tidy.Tidy;
 import org.xhtmlrenderer.pdf.ITextRenderer;
-//import org.xhtmlrenderer.util.XRLog;
+
+import org.apache.log4j.Logger;
+import org.apache.log4j.BasicConfigurator;
 
 import com.lowagie.text.DocumentException;
 
@@ -25,24 +27,23 @@ public class PDFGenerator implements Runnable{
 	private InputStream is;
 	private OutputStream os;
 	private Socket socket = null;
-	private boolean debug = false;
 	
-	public PDFGenerator(String encoding, InputStream is, OutputStream os, boolean debug) {
+	private static final Logger log4j = Logger.getLogger(PDFGenerator.class);
+	
+	public PDFGenerator(String encoding, InputStream is, OutputStream os) {
 		this.encoding = encoding;
 		this.is = is;
 		this.os = os;
-		this.debug = debug;
 	}
 	
-	public PDFGenerator(String encoding, Socket socket, boolean debug) throws IOException {
-		this(encoding, socket.getInputStream(), socket.getOutputStream(), debug);
+	public PDFGenerator(String encoding, Socket socket) throws IOException {
+		this(encoding, socket.getInputStream(), socket.getOutputStream());
 		this.socket = socket;
 	}
 
 	public void run() {
-		if (debug) {
-			System.out.println("Starting new converter thread");
-		}
+		log4j.info("Starting new converter thread");
+
 		try {
 			// create pdf renderer
 			ITextRenderer renderer = new ITextRenderer();
@@ -61,9 +62,7 @@ public class PDFGenerator implements Runnable{
 			tidy.parse(this.is, htmlOutputStream);
 			htmlOutputStream.close();
 			
-			if (debug) {
-				System.out.println("HTML input parsed");
-			}
+			log4j.info("HTML input parsed");
 			
 			// render pdf from tidy html
 			renderer.setDocumentFromString(htmlOutputStream.toString(encoding));
@@ -72,9 +71,7 @@ public class PDFGenerator implements Runnable{
 			// output to system out
 			renderer.createPDF(this.os);
 			
-			if (debug) {
-				System.out.println("PDF Created, closing connection");
-			}
+			log4j.info("PDF Created, closing connection");
 			
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -90,17 +87,15 @@ public class PDFGenerator implements Runnable{
 	
 	public static void main(String[] args) throws IOException,
 			DocumentException, ParseException {
-		
-		// enable logging
-//		System.getProperties().setProperty("xr.util-logging.loggingEnabled", "true");
-//		XRLog.setLoggingEnabled(true);
 
+		// configure log4j
+		BasicConfigurator.configure();
+		
 		// get options
 		Options options = new Options();
 		options.addOption("encoding", true, "Encoding");
 		options.addOption("host", true, "Hostname to run on (default localhost)");
 		options.addOption("port", true, "Local port to run server");
-		options.addOption("debug", false, "Debug mode");
 
 		CommandLineParser parser = new PosixParser();
 		CommandLine cmd = parser.parse(options, args);
@@ -108,21 +103,17 @@ public class PDFGenerator implements Runnable{
 		String port = cmd.getOptionValue("port");
 		// if null, then the loopback is returned (localhost)
 		String host = cmd.getOptionValue("host");
-		boolean debug = false;
-		if (cmd.hasOption("debug")) {
-			debug = true;
-		}
 		
 		// version local server
 		if (null != port) {
 			InetAddress addr = InetAddress.getByName(host);
 			ServerSocket socketserver = new ServerSocket(Integer.parseInt(port), 0, addr);
-			System.out.println("PDFConverter server started on " + addr + ":" + port);
+			log4j.info("PDFConverter server started on " + addr + ":" + port);
 			try {
 				while (true) {
 					Socket client = socketserver.accept();
 					try {
-						Thread pdfGen = new Thread(new PDFGenerator(encoding, client, debug));
+						Thread pdfGen = new Thread(new PDFGenerator(encoding, client));
 						pdfGen.start();
 					} catch(IOException e) {
 						client.close();
@@ -132,8 +123,8 @@ public class PDFGenerator implements Runnable{
 				socketserver.close();
 			}
 		} else {
-			// version classique, STDIN > STDOUT
-			Thread pdfGen = new Thread(new PDFGenerator(encoding, System.in, System.out, debug));
+			// classic version, STDIN > STDOUT
+			Thread pdfGen = new Thread(new PDFGenerator(encoding, System.in, System.out));
 			pdfGen.start();
 		}
 	}
